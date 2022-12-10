@@ -7,6 +7,7 @@ use rocket::{
     get, post, routes,
     serde::{json::Json, Deserialize, Serialize},
 };
+use rocket_prometheus::PrometheusMetrics;
 use std::{collections::HashMap, str::FromStr, time::SystemTime};
 
 use super::{DB, TX};
@@ -147,7 +148,10 @@ fn gen_rep(mut map: HashMap<String, String>) -> Json<Response> {
 }
 
 pub async fn launch() {
+    let prometheus = PrometheusMetrics::new();
     let _ = rocket::build()
+        .attach(prometheus.clone())
+        .mount("/metrics", prometheus)
         .mount("/", routes![discover, register])
         .launch()
         .await;
