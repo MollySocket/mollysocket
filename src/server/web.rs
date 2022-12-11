@@ -7,7 +7,15 @@ use rocket::{
     get, post, routes,
     serde::{json::Json, Deserialize, Serialize},
 };
-use rocket_prometheus::PrometheusMetrics;
+use rocket_prometheus::{
+    prometheus::{
+        register_int_gauge_vec,
+        IntGaugeVec
+    },
+    PrometheusMetrics
+};
+
+use lazy_static::lazy_static;
 use std::{collections::HashMap, str::FromStr, time::SystemTime};
 
 use super::{DB, TX};
@@ -147,8 +155,22 @@ fn gen_rep(mut map: HashMap<String, String>) -> Json<Response> {
     Json(Response { mollysocket: map })
 }
 
+
+lazy_static! {
+    static ref METRIC_MOLLYSOCKET_UP: IntGaugeVec =
+         register_int_gauge_vec!("mollysocket_up", "Is Mollysocket ready", &["version"]).unwrap();
+}
+
 pub async fn launch() {
     let prometheus = PrometheusMetrics::new();
+    prometheus
+        .registry()
+        .register(Box::new(METRIC_MOLLYSOCKET_UP.clone()))
+        .unwrap();
+    
+    // set metric values (should be an rocket guard later if multiple metrics are there)
+    METRIC_MOLLYSOCKET_UP.with_label_values(&[CONFIG.version.as_str()]).set(1);
+    
     let _ = rocket::build()
         .attach(prometheus.clone())
         .mount("/metrics", prometheus)
