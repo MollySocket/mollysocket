@@ -1,6 +1,9 @@
 use crate::{
     db::Connection,
-    server::{DB, REFS, TX},
+    server::{
+        DB, REFS, TX,
+        METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
+    },
     ws::SignalWebSocket,
     CONFIG,
 };
@@ -55,19 +58,29 @@ async fn connection_loop(co: &mut Connection) {
             tx,
         });
     }
+    let metric_connect = METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.with_label_values(&[
+        &co.strategy.clone().to_string(),
+        &co.uuid.clone()
+    ]);
     let mut socket = match SignalWebSocket::new(
         CONFIG.get_ws_endpoint(&co.uuid, co.device_id, &co.password),
         co.endpoint.clone(),
         co.strategy.clone(),
     ) {
-        Ok(s) => s,
+        Ok(s) =>  {
+            metric_connect.inc();
+            s
+        },
         Err(e) => {
             log::info!("An error occured for {}: {}", co.uuid, e);
             return;
         }
     };
     select!(
-        res = socket.connection_loop().fuse() => handle_connection_closed(res, co),
+        res = socket.connection_loop().fuse() => {
+            metric_connect.dec();
+            handle_connection_closed(res, co)
+        },
         _ = rx.next().fuse() => log::info!("Connection killed"),
     );
     let mut refs = REFS.lock().unwrap();
