@@ -3,6 +3,12 @@ use futures_util::{future::join, pin_mut, select, FutureExt};
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 use tokio::signal;
+use rocket_prometheus::{
+    prometheus::{
+        register_int_gauge_vec,
+        IntGaugeVec
+    },
+};
 
 mod connections;
 mod web;
@@ -11,6 +17,11 @@ lazy_static! {
     static ref REFS: Arc<Mutex<Vec<connections::LoopRef>>> = Arc::new(Mutex::new(vec![]));
     static ref DB: MollySocketDb = MollySocketDb::new().unwrap();
     static ref TX: Arc<Mutex<connections::OptSender>> = Arc::new(Mutex::new(None));
+
+    static ref METRIC_MOLLYSOCKET_UP: IntGaugeVec =
+         register_int_gauge_vec!("mollysocket_up", "Is Mollysocket ready", &["version"]).unwrap();
+    static ref METRIC_MOLLYSOCKET_SIGNAL_CONNECTED: IntGaugeVec =
+         register_int_gauge_vec!("mollysocket_signal_connected", "Connected to signal", &["type","uuid"]).unwrap();
 }
 
 pub async fn run() {
