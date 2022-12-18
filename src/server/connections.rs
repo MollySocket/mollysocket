@@ -3,6 +3,7 @@ use crate::{
     server::{
         DB, REFS, TX,
         METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
+        METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
     },
     ws::SignalWebSocket,
     CONFIG,
@@ -58,7 +59,7 @@ async fn connection_loop(co: &mut Connection) {
             tx,
         });
     }
-    let metric_connect = METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.with_label_values(&[
+    let metric_connected = METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.with_label_values(&[
         &co.strategy.clone().to_string(),
         &co.uuid.clone()
     ]);
@@ -68,7 +69,11 @@ async fn connection_loop(co: &mut Connection) {
         co.strategy.clone(),
     ) {
         Ok(s) =>  {
-            metric_connect.inc();
+            metric_connected.inc();
+            METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED.with_label_values(&[
+                &co.strategy.clone().to_string(),
+                &co.uuid.clone()
+            ]).inc();
             s
         },
         Err(e) => {
@@ -78,7 +83,7 @@ async fn connection_loop(co: &mut Connection) {
     };
     select!(
         res = socket.connection_loop().fuse() => {
-            metric_connect.dec();
+            metric_connected.dec();
             handle_connection_closed(res, co)
         },
         _ = rx.next().fuse() => log::info!("Connection killed"),

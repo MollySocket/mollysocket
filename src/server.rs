@@ -6,7 +6,9 @@ use tokio::signal;
 use rocket_prometheus::{
     prometheus::{
         register_int_gauge_vec,
-        IntGaugeVec
+        IntGaugeVec,
+        register_int_counter_vec,
+        IntCounterVec,
     },
 };
 
@@ -22,6 +24,8 @@ lazy_static! {
          register_int_gauge_vec!("mollysocket_up", "Is Mollysocket ready", &["version"]).unwrap();
     static ref METRIC_MOLLYSOCKET_SIGNAL_CONNECTED: IntGaugeVec =
          register_int_gauge_vec!("mollysocket_signal_connected", "Connected to signal", &["type","uuid"]).unwrap();
+    static ref METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED: IntCounterVec =
+         register_int_counter_vec!("mollysocket_signal_reconnected", "reconnected to signal", &["type","uuid"]).unwrap();
 }
 
 pub async fn run() {

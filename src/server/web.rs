@@ -13,7 +13,9 @@ use std::{collections::HashMap, str::FromStr, time::SystemTime};
 
 use super::{
     DB, TX,
-    METRIC_MOLLYSOCKET_UP, METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
+    METRIC_MOLLYSOCKET_UP,
+    METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
+    METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
 };
 
 #[derive(Serialize)]
@@ -160,6 +162,9 @@ pub async fn launch() {
         .unwrap();
     prom_registry
         .register(Box::new(METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.clone()))
+        .unwrap();
+    prom_registry
+        .register(Box::new(METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED.clone()))
         .unwrap();
     
     // set metric values (should be an rocket guard later if multiple metrics are there)
