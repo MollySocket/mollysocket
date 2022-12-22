@@ -3,13 +3,11 @@ use futures_util::{future::join, pin_mut, select, FutureExt};
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 use tokio::signal;
-use rocket_prometheus::{
-    prometheus::{
-        register_int_gauge_vec,
-        IntGaugeVec,
-        register_int_counter_vec,
-        IntCounterVec,
-    },
+use rocket_prometheus::prometheus::{
+    register_int_gauge_vec,
+    IntGaugeVec,
+    register_int_counter_vec,
+    IntCounterVec,
 };
 
 mod connections;
@@ -22,10 +20,14 @@ lazy_static! {
 
     static ref METRIC_MOLLYSOCKET_UP: IntGaugeVec =
          register_int_gauge_vec!("mollysocket_up", "Is Mollysocket ready", &["version"]).unwrap();
+
     static ref METRIC_MOLLYSOCKET_SIGNAL_CONNECTED: IntGaugeVec =
-         register_int_gauge_vec!("mollysocket_signal_connected", "Connected to signal", &["type","uuid"]).unwrap();
+         register_int_gauge_vec!("mollysocket_signal_connected", "Connected to signal", &["type","uuid","push_endpoint"]).unwrap();
     static ref METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED: IntCounterVec =
-         register_int_counter_vec!("mollysocket_signal_reconnected", "reconnected to signal", &["type","uuid"]).unwrap();
+         register_int_counter_vec!("mollysocket_signal_reconnected", "reconnected to signal", &["type","uuid","push_endpoint"]).unwrap();
+
+    static ref METRIC_MOLLYSOCKET_PUSH: IntCounterVec =
+         register_int_counter_vec!("mollysocket_push", "send (unified) push message", &["type","uuid","push_endpoint"]).unwrap();
 }
 
 pub async fn run() {
