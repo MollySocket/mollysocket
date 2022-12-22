@@ -4,6 +4,7 @@ use crate::{
         DB, REFS, TX,
         METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
         METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
+        METRIC_MOLLYSOCKET_PUSH,
     },
     ws::SignalWebSocket,
     CONFIG,
@@ -61,18 +62,26 @@ async fn connection_loop(co: &mut Connection) {
     }
     let metric_connected = METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.with_label_values(&[
         &co.strategy.clone().to_string(),
-        &co.uuid.clone()
+        &co.uuid.clone(),
+        &co.endpoint.clone(),
+    ]);
+    let metric_push = METRIC_MOLLYSOCKET_PUSH.with_label_values(&[
+        &co.strategy.clone().to_string(),
+        &co.uuid.clone(),
+        &co.endpoint.clone(),
     ]);
     let mut socket = match SignalWebSocket::new(
         CONFIG.get_ws_endpoint(&co.uuid, co.device_id, &co.password),
         co.endpoint.clone(),
         co.strategy.clone(),
+        Some(metric_push),
     ) {
         Ok(s) =>  {
             metric_connected.inc();
             METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED.with_label_values(&[
                 &co.strategy.clone().to_string(),
-                &co.uuid.clone()
+                &co.uuid.clone(),
+                &co.endpoint.clone(),
             ]).inc();
             s
         },
