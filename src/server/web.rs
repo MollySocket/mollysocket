@@ -7,16 +7,11 @@ use rocket::{
     get, post, routes,
     serde::{json::Json, Deserialize, Serialize},
 };
-use rocket_prometheus::PrometheusMetrics;
-
 use std::{collections::HashMap, str::FromStr, time::SystemTime};
 
 use super::{
     DB, TX,
-    METRIC_MOLLYSOCKET_UP,
-    METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
-    METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
-    METRIC_MOLLYSOCKET_PUSH,
+    metrics,
 };
 
 #[derive(Serialize)]
@@ -156,27 +151,7 @@ fn gen_rep(mut map: HashMap<String, String>) -> Json<Response> {
 
 
 pub async fn launch() {
-    let prometheus = PrometheusMetrics::new();
-    let prom_registry = prometheus.registry();
-    prom_registry
-        .register(Box::new(METRIC_MOLLYSOCKET_UP.clone()))
-        .unwrap();
-    prom_registry
-        .register(Box::new(METRIC_MOLLYSOCKET_SIGNAL_CONNECTED.clone()))
-        .unwrap();
-    prom_registry
-        .register(Box::new(METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED.clone()))
-        .unwrap();
-    prom_registry
-        .register(Box::new(METRIC_MOLLYSOCKET_PUSH.clone()))
-        .unwrap();
-    
-    // set metric values (should be an rocket guard later if multiple metrics are there)
-    METRIC_MOLLYSOCKET_UP.with_label_values(&[CONFIG.version.as_str()]).set(1);
-    
-    let _ = rocket::build()
-        .attach(prometheus.clone())
-        .mount("/metrics", prometheus)
+    let _ = metrics::rocket(rocket::build())
         .mount("/", routes![discover, register])
         .launch()
         .await;
