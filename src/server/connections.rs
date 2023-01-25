@@ -2,9 +2,11 @@ use crate::{
     db::Connection,
     server::{
         DB, REFS, TX,
-        METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
-        METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
-        METRIC_MOLLYSOCKET_PUSH,
+        metrics::{
+            METRIC_MOLLYSOCKET_SIGNAL_CONNECTED,
+            METRIC_MOLLYSOCKET_SIGNAL_RECONNECTED,
+            METRIC_MOLLYSOCKET_PUSH,
+        },
     },
     ws::SignalWebSocket,
     CONFIG,
@@ -91,12 +93,10 @@ async fn connection_loop(co: &mut Connection) {
         }
     };
     select!(
-        res = socket.connection_loop().fuse() => {
-            metric_connected.dec();
-            handle_connection_closed(res, co)
-        },
+        res = socket.connection_loop().fuse() => handle_connection_closed(res, co),
         _ = rx.next().fuse() => log::info!("Connection killed"),
     );
+    metric_connected.dec();
     let mut refs = REFS.lock().unwrap();
     if let Some(i_ref) = refs.iter().position(|l_ref| l_ref.uuid.eq(&co.uuid)) {
         refs.remove(i_ref);
