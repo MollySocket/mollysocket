@@ -9,10 +9,7 @@ use rocket::{
 };
 use std::{collections::HashMap, str::FromStr, time::SystemTime};
 
-use super::{
-    DB, TX,
-    metrics,
-};
+use super::{metrics::MountMetrics, DB, METRICS, TX};
 
 #[derive(Serialize)]
 struct Response {
@@ -149,10 +146,10 @@ fn gen_rep(mut map: HashMap<String, String>) -> Json<Response> {
     Json(Response { mollysocket: map })
 }
 
-
 pub async fn launch() {
-    let _ = metrics::rocket(rocket::build())
+    let _ = rocket::build()
         .mount("/", routes![discover, register])
+        .mount_metrics("/metrics", &METRICS)
         .launch()
         .await;
 }

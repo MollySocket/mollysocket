@@ -7,27 +7,41 @@ use std::{
 };
 use tokio::time;
 use tokio_tungstenite::tungstenite;
-use rocket_prometheus::prometheus::IntCounter;
 
 use super::tls;
 use super::websocket_connection::WebSocketConnection;
 use super::websocket_message::{
     webSocketMessage::Type, WebSocketMessage, WebSocketRequestMessage, WebSocketResponseMessage,
 };
-use crate::{
-    db::Strategy,
-    utils::post_allowed::post_allowed,
-};
+use crate::{db::Strategy, utils::post_allowed::post_allowed};
 
 const PUSH_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[derive(Debug)]
+pub struct Channels {
+    ws_tx: Option<mpsc::UnboundedSender<tungstenite::Message>>,
+    pub on_message_tx: Option<mpsc::UnboundedSender<u32>>,
+    pub on_push_tx: Option<mpsc::UnboundedSender<u32>>,
+    pub on_reconnection_tx: Option<mpsc::UnboundedSender<u32>>,
+}
+
+impl Channels {
+    fn none() -> Self {
+        Self {
+            ws_tx: None,
+            on_message_tx: None,
+            on_push_tx: None,
+            on_reconnection_tx: None,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct SignalWebSocket {
     connect_addr: url::Url,
     push_endpoint: url::Url,
     strategy: Strategy,
-    metric_push: Option<IntCounter>,
-    tx: Option<mpsc::UnboundedSender<tungstenite::Message>>,
+    pub channels: Channels,
     push_instant: Arc<Mutex<Instant>>,
     last_keepalive: Arc<Mutex<Instant>>,
 }
@@ -38,12 +52,12 @@ impl WebSocketConnection for SignalWebSocket {
         &self.connect_addr
     }
 
-    fn get_tx(&self) -> &Option<mpsc::UnboundedSender<tungstenite::Message>> {
-        &self.tx
+    fn get_websocket_tx(&self) -> &Option<mpsc::UnboundedSender<tungstenite::Message>> {
+        &self.channels.ws_tx
     }
 
-    fn set_tx(&mut self, tx: Option<mpsc::UnboundedSender<tungstenite::Message>>) {
-        self.tx = tx;
+    fn set_websocket_tx(&mut self, tx: Option<mpsc::UnboundedSender<tungstenite::Message>>) {
+        self.channels.ws_tx = tx;
     }
 
     fn get_last_keepalive(&self) -> Arc<Mutex<Instant>> {
@@ -64,15 +78,14 @@ impl WebSocketConnection for SignalWebSocket {
 }
 
 impl SignalWebSocket {
-    pub fn new(connect_addr: String, push_endpoint: String, strategy: Strategy, metric_push: Option<IntCounter>) -> Result<Self> {
+    pub fn new(connect_addr: String, push_endpoint: String, strategy: Strategy) -> Result<Self> {
         let connect_addr = url::Url::parse(&connect_addr)?;
         let push_endpoint = url::Url::parse(&push_endpoint)?;
         Ok(Self {
             connect_addr,
             push_endpoint,
             strategy,
-            metric_push,
-            tx: None,
+            channels: Channels::none(),
             push_instant: Arc::new(Mutex::new(
                 Instant::now().checked_sub(PUSH_TIMEOUT).unwrap(),
             )),
@@ -93,6 +106,9 @@ impl SignalWebSocket {
                 if duration > Duration::from_secs(60) {
                     count = 0;
                 }
+            }
+            if let Some(tx) = &self.channels.on_reconnection_tx {
+                let _ = tx.unbounded_send(1);
             }
             count += 1;
             log::info!("Retrying to connect in {}0 secondes.", count);
@@ -115,6 +131,9 @@ impl SignalWebSocket {
         log::debug!("New request");
         if let Some(request) = request {
             if self.read_or_empty(request).await {
+                if let Some(tx) = &self.channels.on_message_tx {
+                    let _ = tx.unbounded_send(1);
+                }
                 if self.waiting_timeout_reached() {
                     self.send_push().await;
                 } else {
@@ -184,9 +203,8 @@ impl SignalWebSocket {
 
         let url = self.push_endpoint.clone();
         let _ = post_allowed(url, &[("type", "message")]).await;
-        match &self.metric_push {
-            Some(metric) => metric.inc(),
-            None => {},
+        if let Some(tx) = &self.channels.on_push_tx {
+            let _ = tx.unbounded_send(1);
         }
     }
 
