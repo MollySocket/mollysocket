@@ -84,7 +84,7 @@ async fn connection_loop(co: &mut Connection) {
 }
 
 fn set_metrics(socket: &mut SignalWebSocket) -> impl Future<Output = ()> {
-    let (on_message_tx, on_message_rx) = mpsc::unbounded::<u32>();
+    let (on_message_tx, on_message_rx) = mpsc::unbounded::<f64>();
     let (on_push_tx, on_push_rx) = mpsc::unbounded::<u32>();
     let (on_reconnection_tx, on_reconnection_rx) = mpsc::unbounded::<u32>();
     socket.channels.on_message_tx = Some(on_message_tx);
@@ -93,8 +93,9 @@ fn set_metrics(socket: &mut SignalWebSocket) -> impl Future<Output = ()> {
     async move {
         select!(
             _ = on_message_rx
-                .for_each(|_| async {
+                .for_each(|e| async move {
                     METRICS.messages.inc();
+                    METRICS.previous_msg.local().observe(e);
                 })
                 .fuse() => (),
             _ = on_push_rx

@@ -3,7 +3,10 @@ use std::fmt::Display;
 use eyre::Result;
 use rocket::{http::uri::Origin, Build, Rocket};
 use rocket_prometheus::{
-    prometheus::{register_int_counter, register_int_gauge, IntCounter, IntGauge},
+    prometheus::{
+        register_histogram, register_int_counter, register_int_gauge, Histogram, IntCounter,
+        IntGauge,
+    },
     PrometheusMetrics,
 };
 
@@ -13,6 +16,7 @@ pub struct Metrics {
     pub reconnections: IntCounter,
     pub messages: IntCounter,
     pub pushs: IntCounter,
+    pub previous_msg: Histogram,
 }
 
 impl Metrics {
@@ -31,6 +35,15 @@ impl Metrics {
             "mollysocket_pushs",
             "Push messages sent to UnifiedPush endpoint"
         )?;
+        let previous_msg = register_histogram!(
+            "mollysocket_previous_msg",
+            "Time since last message",
+            vec![
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+                16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0,
+                30.0, 40.0, 50.0, 60.0
+            ]
+        )?;
 
         Ok(Self {
             connections,
@@ -38,6 +51,7 @@ impl Metrics {
             reconnections,
             messages,
             pushs,
+            previous_msg,
         })
     }
 }
@@ -71,6 +85,9 @@ impl MountMetrics for Rocket<Build> {
             .unwrap();
         prom_registry
             .register(Box::new(metrics.pushs.clone()))
+            .unwrap();
+        prom_registry
+            .register(Box::new(metrics.previous_msg.clone()))
             .unwrap();
 
         self.attach(prometheus.clone()).mount(base, prometheus)

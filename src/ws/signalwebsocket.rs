@@ -20,7 +20,7 @@ const PUSH_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Debug)]
 pub struct Channels {
     ws_tx: Option<mpsc::UnboundedSender<tungstenite::Message>>,
-    pub on_message_tx: Option<mpsc::UnboundedSender<u32>>,
+    pub on_message_tx: Option<mpsc::UnboundedSender<f64>>,
     pub on_push_tx: Option<mpsc::UnboundedSender<u32>>,
     pub on_reconnection_tx: Option<mpsc::UnboundedSender<u32>>,
 }
@@ -42,6 +42,7 @@ pub struct SignalWebSocket {
     push_endpoint: url::Url,
     pub channels: Channels,
     push_instant: Arc<Mutex<Instant>>,
+    last_instant: Arc<Mutex<Instant>>,
     last_keepalive: Arc<Mutex<Instant>>,
 }
 
@@ -87,6 +88,7 @@ impl SignalWebSocket {
             push_instant: Arc::new(Mutex::new(
                 Instant::now().checked_sub(PUSH_TIMEOUT).unwrap(),
             )),
+            last_instant: Arc::new(Mutex::new(Instant::now())),
             last_keepalive: Arc::new(Mutex::new(Instant::now())),
         })
     }
@@ -137,8 +139,14 @@ impl SignalWebSocket {
         log::debug!("New request");
         if let Some(request) = request {
             if self.read_or_empty(request).await {
+                let elapsed = {
+                    let mut instant = self.last_instant.lock().unwrap();
+                    let elapsed = instant.elapsed();
+                    *instant = Instant::now();
+                    elapsed
+                };
                 if let Some(tx) = &self.channels.on_message_tx {
-                    let _ = tx.unbounded_send(1);
+                    let _ = tx.unbounded_send(elapsed.as_secs_f64());
                 }
                 if self.waiting_timeout_reached() {
                     self.send_push().await;
