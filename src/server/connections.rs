@@ -59,7 +59,7 @@ async fn connection_loop(co: &mut Connection) {
             return;
         }
     };
-    let metrics_future = set_metrics(&mut socket);
+    let metrics_future = set_metrics(co.uuid.clone(), &mut socket);
     // Add the channel to kill the connection if needed
     let (kill_tx, mut kill_rx) = mpsc::unbounded();
     {
@@ -83,7 +83,7 @@ async fn connection_loop(co: &mut Connection) {
     METRICS.connections.dec();
 }
 
-fn set_metrics(socket: &mut SignalWebSocket) -> impl Future<Output = ()> {
+fn set_metrics(uuid: String, socket: &mut SignalWebSocket) -> impl Future<Output = ()> {
     let (on_message_tx, on_message_rx) = mpsc::unbounded::<u32>();
     let (on_push_tx, on_push_rx) = mpsc::unbounded::<u32>();
     let (on_reconnection_tx, on_reconnection_rx) = mpsc::unbounded::<u32>();
@@ -95,6 +95,7 @@ fn set_metrics(socket: &mut SignalWebSocket) -> impl Future<Output = ()> {
             _ = on_message_rx
                 .for_each(|_| async {
                     METRICS.messages.inc();
+                    let _ = DB.new_message(&uuid);
                 })
                 .fuse() => (),
             _ = on_push_rx

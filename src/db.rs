@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS connections(
 )
             ",
         )?;
+        db.execute_batch(
+            "
+CREATE TABLE IF NOT EXISTS msgs(
+    uuid TEXT,
+    date INTEGER,
+    millis INTEGER
+)
+            ",
+        )?;
         Ok(MollySocketDb {
             db: Arc::new(Mutex::new(db)),
         })
@@ -120,6 +129,19 @@ CREATE TABLE IF NOT EXISTS connections(
             .lock()
             .unwrap()
             .execute("DELETE FROM connections WHERE uuid=?1;", [&uuid])?;
+        Ok(())
+    }
+
+    pub fn new_message(&self, uuid: &str) -> Result<()> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
+        self.db.lock().unwrap().execute(
+            "INSERT INTO msgs(uuid, date, millis) VALUES (?, ?, ?);",
+            [
+                uuid,
+                &now.as_secs().to_string(),
+                &now.subsec_millis().to_string(),
+            ],
+        )?;
         Ok(())
     }
 }
