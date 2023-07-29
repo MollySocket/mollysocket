@@ -736,6 +736,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ip_rfc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b8a253fc120dd6c624b7beb0a82330fc0135e0a9cec685bf039a07ba032af1e"
+
+[[package]]
 name = "ipconfig"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -922,6 +928,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "http",
+ "ip_rfc",
  "lazy_static",
  "log",
  "native-tls",
