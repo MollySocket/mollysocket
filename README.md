@@ -1,4 +1,4 @@
-# MollySocket
+# MollySocket (Moved to https://github.com/mollyim/mollysocket)
 
 MollySocket allows getting signal notifications via [UnifiedPush](https://unifiedpush.org/). It works like a linked device, which doesn't have encryption key, connected to the Signal server. Everytime it receives an encrypted event, it notifies your mobile via UnifiedPush.
 
